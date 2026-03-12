@@ -1,14 +1,261 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ridho & Keyla - Eternal Moments</title>
+    <!-- Resource Langsung dari Internet (Tanpa Install) -->
     <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body class="bg-rose-50">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Playfair+Display:italic,wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fff1f2; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body>
     <div id="root"></div>
-    <script type="module" src="/src/App.jsx"></script>
-  </body>
+
+    <script type="module" data-type="babel">
+        // Import Firebase Langsung
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // --- DATA FIREBASE DARI FOTO RIDHO ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDx4Dl4qx_4PJh9f91N3B095fzIDyfbbDQ",
+            authDomain: "ridho-keyla.firebaseapp.com",
+            projectId: "ridho-keyla",
+            storageBucket: "ridho-keyla.firebasestorage.app",
+            messagingSenderId: "888787093462",
+            appId: "1:888787093462:web:02ecddb10dcdc6a80f0677",
+            measurementId: "G-1CTXF49VZB"
+        };
+
+        // Inisialisasi
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Kunci Lainnya
+        const GROQ_API_KEY = "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";
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
+        const TELE_BOT_TOKEN = "8560011254:AAGl8MrvU0jFlkSjMM3drFRPrwju8tMYf70";
+        const TELE_CHAT_ID = "5519975035";
+
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [moments, setMoments] = useState([]);
+            const [isUploadOpen, setIsUploadOpen] = useState(false);
+            const [selected, setSelected] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [days, setDays] = useState(0);
+            
+            const [preview, setPreview] = useState('');
+            const [fileType, setFileType] = useState('image');
+            const [desc, setDesc] = useState('');
+            const fileInput = useRef(null);
+
+            // Icon SVG Components
+            const HeartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>;
+            const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>;
+
+            useEffect(() => {
+                // Hitung hari jadian
+                const anniversary = new Date('2025-10-19');
+                const diff = Math.floor((new Date() - anniversary) / (1000 * 60 * 60 * 24));
+                setDays(diff > 0 ? diff : 0);
+                
+                // Login Firebase
+                signInAnonymously(auth).catch(e => console.error("Login Gagal", e));
+                onAuthStateChanged(auth, (u) => { if(u) setUser(u); });
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                // Ambil data dari Firebase
+                const q = collection(db, 'artifacts', 'ridho-keyla', 'public', 'data', 'moments');
+                return onSnapshot(q, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setMoments(data.sort((a, b) => b.timestamp - a.timestamp));
+                });
+            }, [user]);
+
+            const handleFile = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 1200000) return alert("Ukuran maksimal 1MB ya!");
+                    setFileType(file.type.startsWith('video') ? 'video' : 'image');
+                    const reader = new FileReader();
+                    reader.onload = () => setPreview(reader.result);
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const uploadAction = async () => {
+                if (!preview || loading) return;
+                setLoading(true);
+                try {
+                    let aiAct = desc || "Momen Bahagia";
+                    let aiStory = "Cinta yang tak lekang oleh waktu.";
+
+                    if (fileType === 'image') {
+                        const base64 = preview.split(',')[1];
+                        const vRes = await fetch(GEMINI_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: "Deskripsikan foto ini sedang apa? Berikan konteks untuk Ridho & Keyla." }, { inlineData: { mimeType: "image/png", data: base64 } }] }]
+                            })
+                        });
+                        const vData = await vRes.json();
+                        aiAct = vData.candidates?.[0]?.content?.parts?.[0]?.text || aiAct;
+
+                        const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: "llama-3.3-70b-versatile",
+                                messages: [{ role: "system", content: "Buat 1 kalimat romantis puitis untuk Ridho & Keyla berdasarkan aktivitas mereka." }, { role: "user", content: aiAct }]
+                            })
+                        });
+                        const gData = await gRes.json();
+                        aiStory = gData.choices?.[0]?.message?.content || aiStory;
+                    }
+
+                    // Simpan Firestore
+                    await addDoc(collection(db, 'artifacts', 'ridho-keyla', 'public', 'data', 'moments'), {
+                        mediaData: preview,
+                        mediaType: fileType,
+                        userDescription: desc,
+                        aiActivity: aiAct,
+                        aiStory: aiStory,
+                        timestamp: Date.now()
+                    });
+
+                    // Notif Telegram
+                    const blob = await (await fetch(preview)).blob();
+                    const fd = new FormData();
+                    fd.append('chat_id', TELE_CHAT_ID);
+                    fd.append('caption', `💖 MOMEN BARU\n\n📝 ${desc}\n\n✨ ${aiStory}`);
+                    fd.append(fileType === 'video' ? 'video' : 'photo', blob, 'file');
+                    fetch(`https://api.telegram.org/bot${TELE_BOT_TOKEN}/${fileType === 'video' ? 'sendVideo' : 'sendPhoto'}`, { method: 'POST', body: fd });
+
+                    setIsUploadOpen(false);
+                    setPreview('');
+                    setDesc('');
+                } catch (e) { 
+                    alert("Error! Pastikan Firestore kamu sudah di-ENABLE di Test Mode."); 
+                    console.error(e);
+                }
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+                    {/* Header */}
+                    <div className="w-full max-w-5xl glass p-6 rounded-[2.5rem] shadow-sm border border-rose-100 flex justify-between items-center mb-10 sticky top-4 z-40">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-rose-500 p-2.5 rounded-2xl shadow-lg shadow-rose-200 text-white">
+                                <HeartIcon />
+                            </div>
+                            <div>
+                                <h1 className="font-extrabold text-rose-600 text-lg uppercase leading-none tracking-tighter">Ridho & Keyla</h1>
+                                <p className="text-[10px] font-bold text-rose-300 uppercase tracking-widest mt-1 italic">{days} Hari Bahagia</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setIsUploadOpen(true)} 
+                            className="bg-rose-500 text-white px-6 py-2.5 rounded-2xl font-extrabold text-xs shadow-md transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <PlusIcon /> ABADIKAN
+                        </button>
+                    </div>
+
+                    {/* Gallery Grid */}
+                    {moments.length === 0 ? (
+                        <div className="py-20 text-center opacity-30">
+                            <p className="font-bold uppercase tracking-widest text-xs">Belum ada kenangan. Ayo upload!</p>
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-5xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                            {moments.map(m => (
+                                <div key={m.id} onClick={() => setSelected(m)} className="aspect-square bg-white rounded-[2rem] overflow-hidden shadow-sm border border-rose-50 cursor-pointer hover:-translate-y-1 transition-all group relative">
+                                    {m.mediaType === 'video' ? (
+                                        <div className="h-full w-full flex items-center justify-center bg-rose-50 text-rose-300 italic text-[10px]">VIDEO</div>
+                                    ) : (
+                                        <img src={m.mediaData} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Pop-up Detail */}
+                    {selected && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-900/60 backdrop-blur-md" onClick={() => setSelected(null)}>
+                            <div className="bg-white rounded-[3rem] overflow-hidden max-w-4xl w-full grid md:grid-cols-2 shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
+                                <div className="bg-rose-50 flex items-center justify-center">
+                                    {selected.mediaType === 'video' ? <video src={selected.mediaData} controls autoPlay className="max-h-[70vh] w-full" /> : <img src={selected.mediaData} className="max-h-[70vh] w-full object-contain p-4" />}
+                                </div>
+                                <div className="p-10 flex flex-col justify-center space-y-6">
+                                    <h3 className="text-2xl font-extrabold text-slate-800 italic uppercase leading-tight">"{selected.userDescription}"</h3>
+                                    <div className="space-y-4">
+                                        <div className="bg-rose-50 p-5 rounded-3xl text-xs italic text-slate-600 border border-rose-100">
+                                            <strong>AKTIVITAS:</strong> <br/> {selected.aiActivity}
+                                        </div>
+                                        <div className="bg-pink-50 p-6 rounded-3xl text-xl font-serif italic text-rose-600 border border-pink-100">
+                                            "{selected.aiStory}"
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { if(confirm("Hapus kenangan ini?")) deleteDoc(doc(db, 'artifacts', 'ridho-keyla', 'public', 'data', 'moments', selected.id)).then(() => setSelected(null))}} className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-4">Hapus Permanen</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal Upload */}
+                    {isUploadOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-900/50 backdrop-blur-sm">
+                            <div className="bg-white rounded-[3rem] p-10 max-w-lg w-full space-y-6 shadow-2xl animate-pop">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h2 className="font-extrabold text-rose-600 uppercase italic tracking-tighter text-2xl">Momen Baru</h2>
+                                    <button onClick={() => setIsUploadOpen(false)} className="bg-rose-50 p-2 rounded-full text-rose-300">TUTUP</button>
+                                </div>
+                                <div onClick={() => fileInput.current.click()} className="aspect-video bg-rose-50 border-2 border-dashed border-rose-200 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer overflow-hidden">
+                                    {preview ? (
+                                        fileType === 'video' ? <video src={preview} className="h-full w-full object-cover"/> : <img src={preview} className="h-full w-full object-cover"/>
+                                    ) : (
+                                        <div className="text-center text-rose-200">
+                                            <p className="text-[10px] font-extrabold uppercase tracking-widest">Sentuh Untuk Pilih Foto/Video</p>
+                                            <p className="text-[8px] mt-1">Maksimal 1MB</p>
+                                        </div>
+                                    )}
+                                    <input type="file" ref={fileInput} hidden onChange={handleFile} accept="image/*,video/*" />
+                                </div>
+                                <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ridho, ceritakan sedikit momen ini..." className="w-full p-6 bg-rose-50 rounded-[2.5rem] outline-none text-sm min-h-[100px] border border-transparent focus:border-rose-200 focus:ring-4 focus:ring-rose-100 transition-all" />
+                                <button onClick={uploadAction} disabled={loading || !preview} className="w-full bg-rose-500 text-white py-5 rounded-[2rem] font-extrabold shadow-xl shadow-rose-200 disabled:opacity-50 uppercase text-xs tracking-widest flex items-center justify-center">
+                                    {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "Simpan & Kirim Ke Telegram"}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
 </html>
 
