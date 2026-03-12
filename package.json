@@ -1,7 +1,7 @@
 {
-  "name": "ridho-keyla-app",
+  "name": "ridho-keyla-album",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,13 +12,9 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "firebase": "^10.12.2",
-    "lucide-react": "^0.395.0",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.3.0"
+    "lucide-react": "^0.395.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
